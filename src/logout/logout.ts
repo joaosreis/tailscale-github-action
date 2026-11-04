@@ -14,8 +14,6 @@ async function logout(): Promise<void> {
   try {
     const runnerOS = process.env.RUNNER_OS || "";
     const logMode = getLogMode();
-    // Inputs are available in the post step; default to sudo if unset.
-    const useSudo = core.getInput("use-sudo") !== "false";
 
     await withLogGroup(logMode, "Cleaning up Tailscale", async () => {
       if (runnerOS === runnerMacOS) {
@@ -48,9 +46,7 @@ async function logout(): Promise<void> {
           execArgs = ["tailscale", "logout"];
         } else {
           // Linux and macOS - use system-installed binary with sudo
-          execArgs = useSudo
-            ? ["sudo", "-E", "tailscale", "logout"]
-            : ["tailscale", "logout"];
+          execArgs = ["sudo", "-E", "tailscale", "logout"];
         }
 
         logInfo(logMode, `Running: ${execArgs.join(" ")}`);
@@ -92,16 +88,10 @@ async function logout(): Promise<void> {
           if (pid === "") {
             throw new Error("pid file empty");
           }
-          if (useSudo) {
-            // The pid is actually the pid of the `sudo` parent of tailscaled, so use pkill -P to kill children of that parent
-            await execCommand("sudo", ["pkill", "-P", pid], { logMode });
-            // Clean up DNS and routes.
-            await execCommand("sudo", ["tailscaled", "--cleanup"], { logMode });
-          } else {
-            // Without sudo the pid is tailscaled itself.
-            process.kill(parseInt(pid, 10));
-            await execCommand("tailscaled", ["--cleanup"], { logMode });
-          }
+          // The pid is actually the pid of the `sudo` parent of tailscaled, so use pkill -P to kill children of that parent
+          await execCommand("sudo", ["pkill", "-P", pid], { logMode });
+          // Clean up DNS and routes.
+          await execCommand("sudo", ["tailscaled", "--cleanup"], { logMode });
         }
         logInfo(logMode, "✅ Stopped tailscale");
       } catch (error) {
