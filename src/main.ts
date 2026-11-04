@@ -59,6 +59,7 @@ interface TailscaleConfig {
   timeout: string;
   retry: number;
   useCache: boolean;
+  skipInstall: boolean;
   sha256Sum: string;
   pingHosts: string[];
   logMode: LogMode;
@@ -101,7 +102,8 @@ async function run(): Promise<void> {
     if (
       runnerOS === runnerMacOS &&
       config.version === versionUnstable &&
-      config.useCache
+      config.useCache &&
+      !config.skipInstall
     ) {
       throw new Error(
         "Caching of unstable releases is not supported on macOS runners",
@@ -111,28 +113,35 @@ async function run(): Promise<void> {
     // Validate authentication
     validateAuth(config);
 
-    await withLogGroup(
-      config.logMode,
-      "Resolving Tailscale version",
-      async () => {
-        config.resolvedVersion = await resolveVersion(
-          config.version,
-          runnerOS,
-          config.logMode,
-        );
-        logInfo(
-          config.logMode,
-          `Resolved Tailscale version: ${config.resolvedVersion}`,
-        );
-      },
-    );
+    if (config.skipInstall) {
+      logInfo(
+        config.logMode,
+        "skip-install is set: assuming tailscale and tailscaled are already installed; skipping version resolution, cache restore and install.",
+      );
+    } else {
+      await withLogGroup(
+        config.logMode,
+        "Resolving Tailscale version",
+        async () => {
+          config.resolvedVersion = await resolveVersion(
+            config.version,
+            runnerOS,
+            config.logMode,
+          );
+          logInfo(
+            config.logMode,
+            `Resolved Tailscale version: ${config.resolvedVersion}`,
+          );
+        },
+      );
 
-    // Set architecture
-    config.arch = getTailscaleArch(runnerOS);
+      // Set architecture
+      config.arch = getTailscaleArch(runnerOS);
 
-    await withLogGroup(config.logMode, "Installing Tailscale", async () => {
-      await installTailscale(config, runnerOS);
-    });
+      await withLogGroup(config.logMode, "Installing Tailscale", async () => {
+        await installTailscale(config, runnerOS);
+      });
+    }
 
     if (runnerOS !== runnerWindows) {
       await withLogGroup(config.logMode, "Starting tailscaled", async () => {
@@ -273,6 +282,7 @@ async function getInputs(): Promise<TailscaleConfig> {
     timeout: core.getInput("timeout") || "60s", // Reduced from 2m to 60s
     retry: parseInt(core.getInput("retry") || "5"),
     useCache: core.getBooleanInput("use-cache"),
+    skipInstall: core.getBooleanInput("skip-install"),
     sha256Sum: core.getInput("sha256sum") || "",
     pingHosts: pingHosts,
     logMode: logMode,
@@ -397,16 +407,6 @@ async function installTailscale(
   config: TailscaleConfig,
   runnerOS: string,
 ): Promise<void> {
-  // Skip cache restore and install if the runner already has Tailscale.
-  const existing = findExistingTailscale(runnerOS);
-  if (existing) {
-    logInfo(
-      config.logMode,
-      `Tailscale already installed (${existing.tailscale}); skipping cache restore and install. The version input (${config.resolvedVersion}) is ignored.`,
-    );
-    return;
-  }
-
   const cacheKey = generateCacheKey(config, runnerOS);
   const toolPath = getToolPath(config, runnerOS);
 
@@ -970,41 +970,6 @@ function parseTimeout(timeout: string): number {
     default:
       return value * 1000;
   }
-}
-
-// Looks up an executable on PATH, returning its full path if found.
-function whichSync(name: string): string | undefined {
-  const exts =
-    process.platform === "win32"
-      ? (process.env.PATHEXT || ".EXE;.CMD;.BAT").split(";")
-      : [""];
-  for (const dir of (process.env.PATH || "").split(path.delimiter)) {
-    if (!dir) continue;
-    for (const ext of exts) {
-      const candidate = path.join(dir, name + ext);
-      try {
-        if (fs.statSync(candidate).isFile()) {
-          fs.accessSync(candidate, fs.constants.X_OK);
-          return candidate;
-        }
-      } catch {
-        // not found in this directory
-      }
-    }
-  }
-  return undefined;
-}
-
-// Detects a pre-installed Tailscale. On Windows the daemon runs as a service,
-// so only the CLI needs to be present.
-function findExistingTailscale(
-  runnerOS: string,
-): { tailscale: string; tailscaled?: string } | undefined {
-  const tailscale = whichSync(cmdTailscale);
-  if (!tailscale) return undefined;
-  if (runnerOS === runnerWindows) return { tailscale };
-  const tailscaled = whichSync(cmdTailscaled);
-  return tailscaled ? { tailscale, tailscaled } : undefined;
 }
 
 function sleep(ms: number): Promise<void> {

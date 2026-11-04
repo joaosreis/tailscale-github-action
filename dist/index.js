@@ -52230,20 +52230,26 @@ async function run() {
         const config = await getInputs();
         if (runnerOS === runnerMacOS &&
             config.version === versionUnstable &&
-            config.useCache) {
+            config.useCache &&
+            !config.skipInstall) {
             throw new Error("Caching of unstable releases is not supported on macOS runners");
         }
         // Validate authentication
         validateAuth(config);
-        await (0, logging_1.withLogGroup)(config.logMode, "Resolving Tailscale version", async () => {
-            config.resolvedVersion = await resolveVersion(config.version, runnerOS, config.logMode);
-            (0, logging_1.logInfo)(config.logMode, `Resolved Tailscale version: ${config.resolvedVersion}`);
-        });
-        // Set architecture
-        config.arch = getTailscaleArch(runnerOS);
-        await (0, logging_1.withLogGroup)(config.logMode, "Installing Tailscale", async () => {
-            await installTailscale(config, runnerOS);
-        });
+        if (config.skipInstall) {
+            (0, logging_1.logInfo)(config.logMode, "skip-install is set: assuming tailscale and tailscaled are already installed; skipping version resolution, cache restore and install.");
+        }
+        else {
+            await (0, logging_1.withLogGroup)(config.logMode, "Resolving Tailscale version", async () => {
+                config.resolvedVersion = await resolveVersion(config.version, runnerOS, config.logMode);
+                (0, logging_1.logInfo)(config.logMode, `Resolved Tailscale version: ${config.resolvedVersion}`);
+            });
+            // Set architecture
+            config.arch = getTailscaleArch(runnerOS);
+            await (0, logging_1.withLogGroup)(config.logMode, "Installing Tailscale", async () => {
+                await installTailscale(config, runnerOS);
+            });
+        }
         if (runnerOS !== runnerWindows) {
             await (0, logging_1.withLogGroup)(config.logMode, "Starting tailscaled", async () => {
                 await startTailscaleDaemon(config);
@@ -52362,6 +52368,7 @@ async function getInputs() {
         timeout: core.getInput("timeout") || "60s", // Reduced from 2m to 60s
         retry: parseInt(core.getInput("retry") || "5"),
         useCache: core.getBooleanInput("use-cache"),
+        skipInstall: core.getBooleanInput("skip-install"),
         sha256Sum: core.getInput("sha256sum") || "",
         pingHosts: pingHosts,
         logMode: logMode,

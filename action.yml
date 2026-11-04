@@ -52,6 +52,10 @@ inputs:
     description: 'Enable caching of Tailscale binaries to speed up subsequent runs.'
     required: false
     default: 'true'
+  skip-install:
+    description: 'Assume `tailscale` and `tailscaled` are already installed on the runner and skip version resolution, cache restore, and installation. The `version`, `use-cache`, and `sha256sum` inputs are ignored.'
+    required: false
+    default: 'false'
   statedir:
     description: 'Directory to store Tailscale state. If empty, uses in-memory storage.'
     required: false

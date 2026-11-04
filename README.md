@@ -184,6 +184,20 @@ Although caching is generally recommended, you can disable it by passing `'false
 When running on self-hosted runners that persist after CI jobs have finished,
 the GitHub Action leaves tailscale binaries installed but stops the tailscale background processes.
 
+## Using a preinstalled Tailscale
+
+If your runner already has `tailscale` and `tailscaled` installed (and on `PATH`), set `skip-install` to `'true'`.
+The action will skip version resolution, cache restore, and installation. The `version`, `use-cache`, and `sha256sum` inputs are ignored.
+
+```yaml
+- name: Tailscale
+  uses: tailscale/github-action@v4
+  with:
+    oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+    skip-install: "true"
+```
+
 ## Troubleshooting
 
 ### requested tags [tag:mytag] are invalid or not permitted
