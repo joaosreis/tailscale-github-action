@@ -198,6 +198,8 @@ The action will skip version resolution, cache restore, and installation. The `v
     skip-install: "true"
 ```
 
+If `sudo` is not on `PATH` or lives somewhere non-standard, set `sudo-path` to its location (for example `/run/wrappers/bin/sudo` on NixOS).
+
 ## Troubleshooting
 
 ### requested tags [tag:mytag] are invalid or not permitted

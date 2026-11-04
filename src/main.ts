@@ -27,6 +27,9 @@ const cmdTailscaleFullPath = "/usr/local/bin/tailscale";
 const cmdTailscaled = "tailscaled";
 const cmdTailscaledFullPath = "/usr/local/bin/tailscaled";
 
+// Path or name of the sudo executable; overridden by the sudo-path input.
+let sudoCmd = "sudo";
+
 const runnerLinux = "Linux";
 const runnerWindows = "Windows";
 const runnerMacOS = "macOS";
@@ -98,6 +101,7 @@ async function run(): Promise<void> {
 
     // Get and validate inputs
     const config = await getInputs();
+    sudoCmd = core.getInput("sudo-path") || "sudo";
 
     if (
       runnerOS === runnerMacOS &&
@@ -558,7 +562,7 @@ async function installTailscaleLinux(
   // Install binaries to /usr/local/bin
   await execSilent(
     "copy tailscale binaries to /usr/local/bin",
-    "sudo",
+    sudoCmd,
     [
       "cp",
       path.join(toolPath, cmdTailscale),
@@ -571,13 +575,13 @@ async function installTailscaleLinux(
   // Make sure they're executable
   await execSilent(
     "chmod tailscale binary",
-    "sudo",
+    sudoCmd,
     ["chmod", "+x", cmdTailscaleFullPath],
     { logMode: config.logMode },
   );
   await execSilent(
     "chmod tailscaled binary",
-    "sudo",
+    sudoCmd,
     ["chmod", "+x", cmdTailscaledFullPath],
     { logMode: config.logMode },
   );
@@ -728,7 +732,7 @@ async function installTailscaleMacOS(
   // Install binaries to /usr/local/bin
   await execSilent(
     "copy binaries to /usr/local/bin",
-    "sudo",
+    sudoCmd,
     [
       "cp",
       path.join(toolPath, cmdTailscale),
@@ -741,13 +745,13 @@ async function installTailscaleMacOS(
   // Make sure they're executable
   await execSilent(
     "chmod tailscale",
-    "sudo",
+    sudoCmd,
     ["chmod", "+x", cmdTailscaleFullPath],
     { logMode: config.logMode },
   );
   await execSilent(
     "chmod tailscaled",
-    "sudo",
+    sudoCmd,
     ["chmod", "+x", cmdTailscaledFullPath],
     { logMode: config.logMode },
   );
@@ -778,7 +782,7 @@ async function startTailscaleDaemon(config: TailscaleConfig): Promise<void> {
   logInfo(config.logMode, "Starting tailscaled daemon...");
 
   // Start daemon in background
-  const daemon = spawn("sudo", ["-E", cmdTailscaled, ...args], {
+  const daemon = spawn(sudoCmd, ["-E", cmdTailscaled, ...args], {
     detached: true,
     stdio: [
       "ignore",
@@ -911,7 +915,7 @@ async function connectToTailscale(
         execArgs = [cmdTailscale, ...upArgs];
       } else {
         // Linux and macOS - use system-installed binary with sudo
-        execArgs = ["sudo", "-E", cmdTailscale, ...upArgs];
+        execArgs = [sudoCmd, "-E", cmdTailscale, ...upArgs];
       }
 
       const timeoutMs = parseTimeout(config.timeout);
@@ -1014,25 +1018,25 @@ async function installCachedBinaries(
     if (fs.existsSync(tailscaleBin) && fs.existsSync(tailscaledBin)) {
       await execSilent(
         "copy tailscale from cache",
-        "sudo",
+        sudoCmd,
         ["cp", tailscaleBin, cmdTailscaleFullPath],
         { logMode: config.logMode },
       );
       await execSilent(
         "copy tailscaled from cache",
-        "sudo",
+        sudoCmd,
         ["cp", tailscaledBin, cmdTailscaledFullPath],
         { logMode: config.logMode },
       );
       await execSilent(
         "chmod tailscale",
-        "sudo",
+        sudoCmd,
         ["chmod", "+x", cmdTailscaleFullPath],
         { logMode: config.logMode },
       );
       await execSilent(
         "chmod tailscaled",
-        "sudo",
+        sudoCmd,
         ["chmod", "+x", cmdTailscaledFullPath],
         { logMode: config.logMode },
       );
