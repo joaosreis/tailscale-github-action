@@ -52234,6 +52234,9 @@ async function run() {
             !config.skipInstall) {
             throw new Error("Caching of unstable releases is not supported on macOS runners");
         }
+        if (!config.useSudo && !config.skipInstall) {
+            throw new Error("use-sudo: false requires skip-install: true, because installing Tailscale needs sudo");
+        }
         // Validate authentication
         validateAuth(config);
         if (config.skipInstall) {
@@ -52369,6 +52372,7 @@ async function getInputs() {
         retry: parseInt(core.getInput("retry") || "5"),
         useCache: core.getBooleanInput("use-cache"),
         skipInstall: core.getBooleanInput("skip-install"),
+        useSudo: core.getBooleanInput("use-sudo"),
         sha256Sum: core.getInput("sha256sum") || "",
         pingHosts: pingHosts,
         logMode: logMode,
@@ -52700,7 +52704,10 @@ async function startTailscaleDaemon(config) {
     ];
     (0, logging_1.logInfo)(config.logMode, "Starting tailscaled daemon...");
     // Start daemon in background
-    const daemon = (0, child_process_1.spawn)("sudo", ["-E", cmdTailscaled, ...args], {
+    const daemonCmd = config.useSudo
+        ? ["sudo", "-E", cmdTailscaled, ...args]
+        : [cmdTailscaled, ...args];
+    const daemon = (0, child_process_1.spawn)(daemonCmd[0], daemonCmd.slice(1), {
         detached: true,
         stdio: [
             "ignore",
@@ -52813,8 +52820,10 @@ async function connectToTailscale(config, runnerOS) {
                 execArgs = [cmdTailscale, ...upArgs];
             }
             else {
-                // Linux and macOS - use system-installed binary with sudo
-                execArgs = ["sudo", "-E", cmdTailscale, ...upArgs];
+                // Linux and macOS - use system-installed binary, with sudo unless opted out
+                execArgs = config.useSudo
+                    ? ["sudo", "-E", cmdTailscale, ...upArgs]
+                    : [cmdTailscale, ...upArgs];
             }
             const timeoutMs = parseTimeout(config.timeout);
             let timeoutHandle;

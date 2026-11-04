@@ -56,6 +56,10 @@ inputs:
     description: 'Assume `tailscale` and `tailscaled` are already installed on the runner and skip version resolution, cache restore, and installation. The `version`, `use-cache`, and `sha256sum` inputs are ignored.'
     required: false
     default: 'false'
+  use-sudo:
+    description: 'Run `tailscaled` and `tailscale` via `sudo` on Linux and macOS. Set to `false` if the runner user can already run them (e.g. root, or a container without sudo). Requires `skip-install: true`.'
+    required: false
+    default: 'true'
   statedir:
     description: 'Directory to store Tailscale state. If empty, uses in-memory storage.'
     required: false
